@@ -137,6 +137,7 @@ int sys_getpinfo(void)
       p->tickets[idx] = i->tickets;
       p->inuse[idx] = i->inuse; 
     }
+    i++;
   } 
   release(&ptable.lock);
   return 0;
