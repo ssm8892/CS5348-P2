@@ -1,0 +1,145 @@
+#include "types.h"
+#include "x86.h"
+#include "defs.h"
+#include "param.h"
+#include "mmu.h"
+#include "proc.h"
+#include "sysfunc.h"
+#include "pstat.h"
+
+int
+sys_fork(void)
+{
+  return fork();
+}
+
+int
+sys_exit(void)
+{
+  exit();
+  return 0;  // not reached
+}
+
+int
+sys_wait(void)
+{
+  return wait();
+}
+
+int
+sys_kill(void)
+{
+  int pid;
+
+  if(argint(0, &pid) < 0)
+    return -1;
+  return kill(pid);
+}
+
+int
+sys_getpid(void)
+{
+  return proc->pid;
+}
+
+int
+sys_sbrk(void)
+{
+  int addr;
+  int n;
+
+  if(argint(0, &n) < 0)
+    return -1;
+  addr = proc->sz;
+  if(growproc(n) < 0)
+    return -1;
+  return addr;
+}
+
+int
+sys_sleep(void)
+{
+  int n;
+  uint ticks0;
+  
+  if(argint(0, &n) < 0)
+    return -1;
+  acquire(&tickslock);
+  ticks0 = ticks;
+  while(ticks - ticks0 < n){
+    if(proc->killed){
+      release(&tickslock);
+      return -1;
+    }
+    sleep(&ticks, &tickslock);
+  }
+  release(&tickslock);
+  return 0;
+}
+
+// return how many clock tick interrupts have occurred
+// since boot.
+int
+sys_uptime(void)
+{
+  uint xticks;
+  
+  acquire(&tickslock);
+  xticks = ticks;
+  release(&tickslock);
+  return xticks;
+}
+
+
+/* The following code is added by Sai Motukuri - SSM190012
+** Definition of the settickets system call
+*/
+int sys_settickets(void)
+{
+  int numTickets;
+  argint(0, &numTickets);
+  if(numTickets < 1)
+  {
+    return -1;
+  }
+
+  acquire(&ptable.lock);
+  setProcessTickets(proc, numTickets);
+  release(&ptable.lock);
+
+  return 0;
+}
+/* End of code added */
+
+
+/* The following code is added by Sai Motukuri - SSM190012
+** Definition of the getinfo system call
+*/
+int sys_getpinfo(void)
+{
+  struct pstat* p;
+  argptr(0,(void*)&p, sizeof(*p));
+  if(p == NULL)
+  {
+    return -1;
+  }
+
+  acquire(&ptable.lock);
+  struct proc* i = ptable.proc;
+
+  while(i != &(ptable.proc[NPROC]))
+  {
+    const int idx = i - ptable.proc;
+    if(i->state != UNUSED)
+    {
+      p->pid[idx] = i->pid;
+      p->ticks[idx] = i->ticks;
+      p->tickets[idx] = i->tickets;
+      p->inuse[idx] = i->inuse; 
+    }
+    i++;
+  } 
+  release(&ptable.lock);
+  return 0;
+}
+/* End of code added */
